@@ -1,14 +1,16 @@
 :- use_module(library(dcg/basics)).
 :- use_module(library(dcg/high_order)).
 
-source_start, ` ` --> ``.
+%% LEXER PART %%
 
 program_tokenized(Tokens) --> source_start, sequence(token, Tokens), blanks.
+
+source_start, ` ` --> ``.
 
 token(bare_word(Bare_Word_Atom)) --> blank, blanks, csym(Bare_Word_Atom).
 token(number(Number)) --> blank, blanks, number(Number).
 token(char(Char_Code)), ` ` --> blanks, `'`, char_content(Char_Code), `'`.
-token(string(String)) --> blanks, `"`, string_content(String), `"`.
+token(string(String)), ` ` --> blanks, `"`, string_content(String), `"`.
 token(special(Special_Atom)), ` ` --> blanks, single_prefix_special(Special_Atom).
 token(special(Special_Atom)), ` ` --> blanks, { special(Special_Atom), atom_codes(Special_Atom, Content) }, Content.
 
@@ -41,7 +43,8 @@ apostrophe_char_content(39) --> `'`.
 escape_char_content(Char_Code) --> `\\`, escape_determiner_part(Char_Code).
 
 escape_determiner_part(9) --> `t`.
-escape_determiner_part(13) --> `n`.
+escape_determiner_part(10) --> `n`.
+escape_determiner_part(13) --> `r`.
 escape_determiner_part(34) --> `"`.
 escape_determiner_part(39) --> `'`.
 escape_determiner_part(92) --> `\\`.
@@ -59,3 +62,25 @@ char_content_in_string(Char_Code) --> apostrophe_char_content(Char_Code).
 char_content_in_string(Char_Code) --> safe_char_content(Char_Code).
 
 string_content(String) --> sequence(char_content_in_string, Codes), { string_codes(String, Codes) }.
+
+%% PARSER PART %%
+
+function_declaration(_) --> function_signature(_), special(';').
+
+function_definition(_) --> function_signature(_), block(_).
+
+block(_) --> special('{'), sequence(statement, _), special('}').
+
+statement(_) --> variable_definition(_).
+% TODO: typedef? function declaration?
+statement(_) --> prefix_control_statement(_). % if, while, for(?)
+statement(_) --> do_while_statement(_).
+statement(_) --> switch_statement(_). % or model as prefix_control_statement? I only want to allow `case` here tbh
+statement(_) --> goto_statement(_).
+statement(_) --> expression(_), special(';').
+
+% expressions will be tough:
+% - consider handling precedence
+% - parens
+% - function applications
+% - all operators, including indexing and ternaries
